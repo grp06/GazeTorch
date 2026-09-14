@@ -1,0 +1,6 @@
+# For eyediap enable_w_wrt_subject_id should be False!
+type: Eyediap_old
+args:
+  enable_w_wrt_subject_id: False
+  augment: False
+  split: val

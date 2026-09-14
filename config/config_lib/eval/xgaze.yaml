@@ -1,0 +1,4 @@
+type: XGaze_v2
+args:
+  augment: False
+  split: test

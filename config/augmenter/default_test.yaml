@@ -1,0 +1,98 @@
+normalize:
+  switch: True
+  mean:
+  std:
+
+color_jitter_gamma:
+  switch: False
+  gamma_L_min: 0.5 # brightness
+  gamma_L_max: 1.5
+  gamma_C_min: -0.2 # color channel
+  gamma_C_max: 0.2
+
+color_jitter_spline:
+  switch: False
+  a: 0.5 # larger = less intense
+  k: 1. # larger = more intense
+
+desat:
+  switch: False
+  p: 0.1
+
+noise:
+  switch: False
+  p: 0.3
+  std_min: 0.05
+  std_max: 0.2
+
+global_noise:
+  switch: False
+  p: 0.5
+  std_min: 0.
+  std_max: 0.25
+
+camera_noise:
+  switch: False
+  p: 0.5
+  chroma_strength: 15.0
+  chroma_blotch_size: 2.0
+  chroma_cr_bias: 1.0
+  chroma_cb_bias: 1.0
+  luma_sigma: 11.0
+
+blur:
+  switch: False
+  p: 0.3
+  std_min: 0.5
+  std_max: 2
+  kernel_size: 9
+
+replace_green:
+  switch: False
+  p: 0.25
+
+pattern:
+  switch: False
+  opacity_min: 0.6
+  opacity_max: 0.8
+  scale_min: 0.6
+  scale_max: 1.2
+
+glasses:
+  switch: False
+  p: 0.5
+  scale_min: 0.9
+  scale_max: 1.1
+  opacity_min: 0.3
+  opacity_max: 1.0
+  select_frame: both # This could be [both, left, right, none random]
+  opacity_glass_right_min: 0.2
+  opacity_glass_right_max: 0.7
+  opacity_glass_left_min: 0.2
+  opacity_glass_left_max: 0.7
+  reflection: False
+  p_reflection: 0.8
+
+add_mask:
+  switch: False
+  p: 0.5
+  opacity_min: 0.4
+  opacity_max: 1.
+
+bottom_crop:
+  switch: False
+  p: 0.1
+
+gradient:
+  switch: False
+  p: 0.5
+  color_value_max: 0.4
+  opacity_min: 0.4
+  opacity_max: 1.
+
+jitter:
+  switch: False
+  scale_min: 0.8
+  scale_max: 1.2
+  trans_max: 0.1
+  rotate_max: 0

@@ -1,0 +1,4 @@
+type: RT_GENE
+args:
+  enable_w_wrt_subject_id: True
+  augment: False

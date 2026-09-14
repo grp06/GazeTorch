@@ -1,0 +1,4 @@
+type: MPIIFace
+args:
+  augment: False
+  split: val

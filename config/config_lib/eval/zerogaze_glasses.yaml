@@ -1,0 +1,4 @@
+type: ZeroGaze_Glasses
+args:
+  augment: False
+  split: all

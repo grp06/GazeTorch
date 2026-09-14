@@ -1,0 +1,4 @@
+type: ZeroGaze_Masks
+args:
+  augment: False
+  split: all

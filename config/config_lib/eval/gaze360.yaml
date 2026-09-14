@@ -1,0 +1,6 @@
+# For eyediap enable_w_wrt_subject_id should be False!
+type: Gaze360
+args:
+  enable_w_wrt_subject_id: True
+  split: val
+  augment: False

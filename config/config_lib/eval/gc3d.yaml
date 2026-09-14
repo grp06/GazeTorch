@@ -1,0 +1,4 @@
+type: GC3d
+args:
+  split: val
+  enable_w_wrt_subject_id: True

@@ -1,0 +1,225 @@
+net:
+  output: [head, head_seg, head_supcon_bin, head_supcon_id, head_supcon_mask, head_supcon_glasses]
+  input: [[224,224,3]]
+  ckpt: # this is for finetuning / loading the checkpoints
+    # dir: temp_ckpt
+    # name: ckpt_epoch_00000.pyth
+
+  face_feature:
+    module_input: # OrderedDict
+      input: all
+    module_output: [[160], [160]] # list
+    type: bisenetv2_mbnt_semantic
+    args:
+      sbranch_normalize: True
+      # num_classes: 512
+      # pretrained: 0
+      # layer_out: layer2
+
+  head:
+    module_input:
+      face_feature: 0
+    module_output: [[2]]
+    type: mlp
+    args:
+      input: 160
+      channels: [128, 2]
+
+  head_supcon_bin:
+    module_input:
+      face_feature: 0
+    module_output: [[128]]
+    type: mlp
+    args:
+      input: 768
+      channels: [128]
+      normalize: True
+
+  head_supcon_id:
+    module_input:
+      face_feature: 0
+    module_output: [[128]]
+    type: mlp
+    args:
+      input: 768
+      channels: [128]
+      normalize: True
+
+  head_supcon_mask:
+    module_input:
+      face_feature: 0
+    module_output: [[128]]
+    type: mlp
+    args:
+      input: 160
+      channels: [128]
+
+  head_supcon_glasses:
+    module_input:
+      face_feature: 0
+    module_output: [[128]]
+    type: mlp
+    args:
+      input: 160
+      channels: [128]
+
+  head_seg:
+    module_input:
+      face_feature: 1
+    module_output: [[8, 224,224]]
+    type: seg
+    args:
+      input: 160
+      channels: [64, 2]
+      n_classes: 2
+   
+train:
+  num_gpus: 8
+  gpus: [0,1,2,3,4,5,6,7]
+  gpu_base: 0
+  batch_per_gpu: 144
+  ckpt_dir: <output_ckpt_path>
+  ckpt_period: 1
+  ckpt_auto_clear: True
+  num_epochs: 80
+  simsiam: 0
+  log_period: 10
+  val_period: 10
+  val_print_car: True
+  infer_test: False
+  iters_limit: 100000
+  lr: 3e-4
+  seed: 0
+  num_views: 1
+  flip_every_other_view: True
+  glasses_latter_half_views: False
+  share_t2d: True
+  bin_temperature: 0.2
+
+  optimizer:
+    face_feature:
+      type: adam
+      lr: 3e-4
+      args:
+    default:
+      type: adam
+      lr: 3e-4
+      args:
+  
+  loss:
+    loss1: #l(x, gt) L([Tensor])
+      module_input:
+        head: all # from Net
+        dataset: [1,2,3] # from Dataset
+      type: l1
+      args:
+        reduce: None
+  
+    loss2:
+      module_input:
+        head_seg: all
+        dataset: [4,5,6,7,8] # from Dataset Bx4x224x224  Bx8x224x224
+      type: dice
+    
+    loss3:
+      module_input:
+        head: all
+        dataset: 1 # from Dataset
+      type: l1
+
+    loss4:
+      module_input:
+        head_supcon_bin: all
+        dataset: 2
+      type: binsupcon
+      args:
+        adversarial: False
+        n_views: 1
+
+    loss5:
+      module_input:
+        head_supcon_id: all
+        dataset: 3 # dataset_id
+      type: supcon
+      args:
+        adversarial: True
+
+    loss6:
+      module_input:
+        head_supcon_mask: all
+        dataset: 10 # aug_mask
+      type: supcon
+      args:
+        adversarial: True
+        n_views: 4
+
+    loss7:
+      module_input:
+        head_supcon_glasses: all
+        dataset: 11 # aug_glasses
+      type: supcon
+      args:
+        adversarial: True
+        n_views: 4
+    
+    
+    loss_train:
+      loss1: 1
+      loss2: 0.5
+      loss4: 0.025 # 1225: big supcon losses cause nan
+      loss5: 0.025
+      loss6: 0.025
+      loss7: 0.025
+
+    loss_val:
+      loss3: 1
+
+data:
+  dataset_train:
+    type: Hybrid_v2
+    args:
+      path_prefix: 'face_224'
+      labels: ['subject_cid', 'gaze', 'bin', 'dataset_id', 'facemap_v3', 'wE_L', 'wI_L', 'wE_R', 'wI_R', 'id', 'aug_mask', 'aug_glasses', 'headpose']
+      mixup: False
+      mixup_halfandhalf: False
+      mixup_thresh: 0.5
+      cam_id: None
+      target_N: 172800
+      bin_sampler: False
+      n_views: 4
+      flip_mode: 'on' # Samuel's feature
+      facemap: True
+      augment: True
+      debug: False
+      face_replace_green: True
+      augment_glasses: True
+      face_apply_mask: True
+      split: 'train'
+      # tags: ['X']
+      skip_val: True
+      bin_args:
+        pitch_nbins: 16
+        yaw_nbins: 20
+        bin_size: 6.0
+        pitch_bias: -12.0
+        headpose_nbins: 9
+        bin_size_hp: 10
+      output_gazemap: True
+  # dataset_val:
+  #   type: Hybrid_v2
+  #   args:
+  #     split: 'val'
+  #     labels: ['subject_cid', 'gaze']
+  #     target_N: 7392
+  #     bin_sampler: False
+  #     facemap: True
+  #     debug: False
+  #     augment: False
+  #     skip_val: True
+  #     bin_args:
+  #       pitch_nbins: 30
+  #       yaw_nbins: 34
+  #       bin_size: 4.0
+  #       pitch_bias: -5.0
+  #     output_gazemap: True
+  #     GC3D_population: 16

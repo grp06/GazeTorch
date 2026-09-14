@@ -1,0 +1,170 @@
+import numpy as np
+import os
+from tqdm import tqdm
+from scipy import interpolate
+import joblib
+import cv2
+import sys
+sys.path.append('../..')
+from cv.headpose import HeadposeDetector
+
+
+
+root = '/data/mpiiface'
+
+'''
+'w_L'
+'w_R'
+'wE_L'
+'wI_L'
+'wE_R'
+'wI_R'
+'headpose'
+'w_wrt_subject_id'
+'''
+
+
+def extract_feature(face, facemap, headpose):
+    leye = facemap[:, :, 0]
+    liris = facemap[:, :, 1]
+    reye = facemap[:, :, 2]
+    riris = facemap[:, :, 3]
+    pitch = headpose[0] * 180 / np.pi
+    yaw = headpose[1] * 180 / np.pi
+    leye[leye != 0] = 255
+    reye[reye != 0] = 255
+    liris[liris != 0] = 255
+    riris[riris != 0] = 255
+    leye_pix = np.count_nonzero(leye == 255)
+    reye_pix = np.count_nonzero(reye == 255)
+    liris_pix = np.count_nonzero(liris == 255)
+    riris_pix = np.count_nonzero(riris == 255)
+    mean_illum = np.mean(face)
+    feature = [leye_pix, liris_pix, reye_pix, riris_pix] + [mean_illum] + [pitch, yaw]
+
+    return feature
+
+def add_eye_confidence_v2(load_filename, save_filename):
+    load_path_npy= os.path.join(root, load_filename)
+    D = np.load(load_path_npy, allow_pickle=True).item()
+    D['wE_L'] = []
+    D['wI_L'] = []
+    D['wE_R'] = []
+    D['wI_R'] = []
+    confidence_regressor = joblib.load('cv/modules/confidence_regressor.sav')
+    confidence_scaler = joblib.load('cv/modules/confidence_scaler.sav')
+  
+    n_skipped = 0
+    for i in tqdm(range(len(D['headpose']))):
+        face_dir = root + '/224/' + str(D['fn'][i]) + '.jpg'
+        facemap_dir = face_dir.replace('224', 'facemap').replace('.jpg', '.png')
+        face = cv2.imread(face_dir)
+        face = cv2.resize(face, (224, 224))
+        facemap = cv2.imread(facemap_dir, cv2.IMREAD_UNCHANGED)
+        headpose = D['headpose'][i]
+        if facemap is None:
+            confs = [0, 0, 0, 0]
+            n_skipped += 1
+        else:
+            feature = extract_feature(face, facemap, headpose)
+            feature = np.array(feature).reshape([1, -1])
+            feature_n = confidence_scaler.transform(feature)
+            confs = confidence_regressor.predict(feature_n)[0]
+            confs[confs < 0.25] = 0
+            confs[confs >= 0.9] = 1
+            confs[(np.where((confs >= 0.25) & (confs <= 0.9)))] = 1.54 * (confs[(np.where((confs >= 0.25) & (confs <= 0.9)))] - 0.25)
+            confs[confs >= 1] = 1
+            confs[confs <= 0] = 0
+
+        D['wE_L'].append(confs[0])
+        D['wI_L'].append(confs[1])
+        D['wE_R'].append(confs[2])
+        D['wI_R'].append(confs[3])
+
+        
+    save_path_npy= os.path.join(root, save_filename)
+    np.save(save_path_npy, D)
+    print('Number of skipped confidences {} out of {}'.format(n_skipped, len(D['headpose'])))
+    print("Voila.")
+
+
+def add_weight_wrt_subject_id(filename_in, filename_out):
+    path_in= os.path.join(root, filename_in)
+    path_out= os.path.join(root, filename_out)
+    D = np.load(path_in, allow_pickle=True).item()
+    subjects = D['subject_cid']
+    unique, counts = np.unique(D['subject_cid'], return_counts=True)
+    dict_count = dict(zip(unique, counts))
+    w_subjects = []
+    for i in range(len(D['fn'])):
+        subject = D['subject_cid'][i]
+        num_data_subject = dict_count[subject]
+        w_subjects.extend([1./num_data_subject])
+    
+
+    D['w_wrt_subject_id'] = w_subjects
+
+    np.save(path_out, D)
+    print("Voila.")
+
+
+def add_fn(filename_in, filename_out):
+    path_in= os.path.join(root, filename_in)
+    path_out= os.path.join(root, filename_out)
+    D = np.load(path_in, allow_pickle=True).item()
+    subjects = D['subject_cid']
+    fns = []
+    for i in range(len(D['subject_cid'])):
+        fns.extend([i])
+
+    D['fn'] = fns
+
+    np.save(path_out, D)
+    print("Voila.")
+
+def fix_headpose(filename_in, filename_out):
+    path_in= os.path.join(root, filename_in)
+    path_out= os.path.join(root, filename_out)
+    D = np.load(path_in, allow_pickle=True).item()
+    D['headpose'] = D['headpose'].reshape([-1, 2])
+    np.save(path_out, D)
+    print("Voila.")
+
+def quantize(filename_in, filename_out, n_bins_pitch=5, n_bins_yaw=11, bin_size=4., pitch_bias=-10.):
+    path_in= os.path.join(root, filename_in)
+    path_out= os.path.join(root, filename_out)
+    D = np.load(path_in, allow_pickle=True).item()
+
+    pitch_limit = (n_bins_pitch//2+0.5) * bin_size 
+    yaw_limit = (n_bins_yaw//2+0.5) * bin_size 
+
+    D['pitch_cid'] = []
+    D['yaw_cid'] = []
+    D['start_ids'] = {}
+
+    for i in tqdm(range(len(D['fn']))):
+        gaze = D['gaze'][i]
+        pitch_cid = int(np.clip((gaze[0] * 180. / np.pi + pitch_limit - pitch_bias) // bin_size, 0, n_bins_pitch-1))
+        yaw_cid = int(np.clip((gaze[1] * 180. / np.pi + yaw_limit) // bin_size, 0, n_bins_yaw-1))
+        D['pitch_cid'].append(pitch_cid)
+        D['yaw_cid'].append(yaw_cid)
+
+    D['pitch_nbins'] = n_bins_pitch
+    D['yaw_nbins'] = n_bins_yaw
+    D['pitch_bias'] = pitch_bias
+    D['bin_size'] = bin_size
+    np.save(path_out, D)
+    print("Voila.")
+
+if __name__=='__main__':
+    # add_fn('gt.npy', 'gt_mpigaze_with_conf_v2.npy')
+    # fix_headpose('gt_mpigaze_with_conf_v2.npy', 'gt_mpigaze_with_conf_v2.npy')
+    # add_eye_confidence_v2('gt_mpigaze_with_conf_v2.npy', 'gt_mpigaze_with_conf_v2.npy')
+    # add_weight_wrt_subject_id('gt_mpigaze_with_conf_v2.npy', 'gt_mpigaze_with_conf_v2.npy')
+    quantize('gt_mpiiface_with_conf_v3.npy', 'gt_mpiiface_with_bin_conf_v3.npy')
+
+
+
+
+
+

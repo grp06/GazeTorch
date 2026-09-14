@@ -1,0 +1,83 @@
+net:
+  output: [head]
+  input: [[3, 224, 224]]
+  # ckpt:
+  #   dir: /root/GazeTorch_test/GazeTorch/playground
+    #name: xxx
+
+  face_feature:
+    module_input: # OrderedDict
+      input: all
+    module_output: [[512]] # list[list[int]]
+    type: resnet50
+    args:
+      num_classes: 512
+    # module_ckpt:
+    #   ckpt_module_dir: /root/GazeTorch_test/GazeTorch/playground/2
+    #   ckpt_module_name: ckpt_epoch_00001.pyth
+
+  head:
+    module_input:
+      face_feature: all
+    module_output: [[2]]
+    type: mlp
+    # module_ckpt:
+    #   ckpt_module_dir: /root/GazeTorch_test/GazeTorch/playground/2
+    #   ckpt_module_name: ckpt_epoch_00001.pyth
+    args:
+      channels: [64, 2]
+  
+train:
+  num_gpus: 2
+  gpus: [0,1]
+  gpu_base: 0
+  batch_per_gpu: 256  # normal is 64
+  ckpt_dir: /root/GazeTorch_test/GazeTorch/playground/6
+  ckpt_period: 5
+  ckpt_auto_clear: True
+  num_epochs: 50
+  log_period: 10
+  val_period: 1
+  no_val_before: 5
+  infer_test: False
+  seed: 0
+
+  optimizer:
+    default:
+      type: adam
+      lr: 3e-4
+      args:
+  
+  loss:
+    loss1: #l(x, gt) L([Tensor])
+      module_input:
+        head: all # from Net
+        dataset: 0 # from Dataset
+      type: l1
+    loss2:
+      module_input:
+        head: all
+        dataset: 0 # from Dataset
+      type: angular
+
+    loss_train:
+      loss1: 1
+
+    loss_val:
+      loss2: 1
+
+data:
+  dataset_train:
+    type: XGaze_v2
+    args:
+      split: train
+      augment: True
+      face_replace_green: True
+      face_simulate_glasses: True
+      face_apply_mask: True
+      # debug: True
+  dataset_val:
+    type: XGaze_v2
+    args:
+      split: val
+      # debug: True

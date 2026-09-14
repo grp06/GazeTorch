@@ -1,0 +1,4 @@
+type: ZeroGaze_Vanilla
+args:
+  augment: False
+  split: all

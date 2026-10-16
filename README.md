@@ -3,12 +3,10 @@
 GazeTorch: Appearance-based Gaze Estimation (AGE) on PyTorch.
 
 ## Dependency
-(well, you can get a setup.py, but do you have at least 4 really, really expensive gpu in your work computer? typically no right, so most likely you need to run it on company container or something so here is more for a reference)
-
 Minimal requirements:
 * PyTorch >= 1.10
 * OpenCV
-* `timm` (for MAE models)
+* `timm` (for MAE models only)
 * `imutils` (for glasses augmentation features)
 
 ## The ZeroGaze-10K dataset
